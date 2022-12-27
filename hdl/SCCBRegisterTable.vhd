@@ -1,3 +1,8 @@
+-----------------------------------------------------------------------------------
+-- OV7670 CMOS kamera modulunun RGB565 modunda calismasini saglayan register
+-- ve bu registerlerin olmasi gereken verileri icerir.
+-----------------------------------------------------------------------------------
+
 library IEEE;
 use IEEE.STD_LOGIC_1164.all;
 use IEEE.STD_LOGIC_UNSIGNED.all;
@@ -111,9 +116,9 @@ begin
             SWriteData      <= (others => '0');
             SCounter        <= 0;
         elsif rising_edge(PIClock) then
-			if SWaitCtr <= 254 then
-				SWaitCtr <= SWaitCtr + 1;
-			else
+		if SWaitCtr <= 254 then
+			SWaitCtr <= SWaitCtr + 1;
+		else
                 if (SReady = '1' and STrigFalling = '1' and SStart = '0') or (SStart = '1' and SReadyRising = '1') then
                     SEnable     <=  '1';
                     SStart      <=  '1';
@@ -288,10 +293,6 @@ begin
                                 SRegister   <= x"B3";
                                 SWriteData  <= x"82";
                             when 55 =>  
-                                --SStart      <=  '0';
-                                --SEnable     <=  '0';
-                                --SCfgFinished    <= '1';
-                                --SCounter        <= 0;
                                 SRegister   <= x"B8";
                                 SWriteData  <= x"0A";
                                 
