@@ -10,10 +10,6 @@ entity SCCBRegisterTable is
         PITrig          : in    std_logic;
         PIDone          : in    std_logic;
         PIReady         : in    std_logic;
-        PIReadData      : in    std_logic_vector(7 downto 0);
-        PIReadDone      : in    std_logic;
-        POMode          : out   std_logic;
-        POReadError     : out   std_logic;
         POCfgFinished   : out   std_logic;
         POStart         : out   std_logic;
         POEnable        : out   std_logic;
@@ -34,20 +30,13 @@ architecture Behavioral of SCCBRegisterTable is
     signal      STrig               :   std_logic                       := '0';
     signal      SDone               :   std_logic                       := '0';
     signal      SReady              :   std_logic                       := '0';
-    signal      SReadDone           :   std_logic                       := '0';
-    signal      SMode               :   std_logic                       := '0';
-    signal      SModeReg            :   std_logic                       := '0';
-    signal      SReadError          :   std_logic                       := '0';
     signal      SCfgFinished        :   std_logic                       := '0';
     signal      SStart              :   std_logic                       := '0';
     signal      SEnable             :   std_logic                       := '0';
     signal      SAddress            :   std_logic_vector(6 downto 0)    := (others => '0');
     signal      SRegister           :   std_logic_vector(7 downto 0)    := (others => '0');
     signal      SWriteData          :   std_logic_vector(7 downto 0)    := (others => '0');
-    signal      SReadData           :   std_logic_vector(7 downto 0)    := (others => '0');
 	 
-    signal      SDonePrev           :   std_logic                       := '0';
-    signal      SReadDonePrev       :   std_logic                       := '0';
 
     signal      STrigPrev           :   std_logic                       := '0';
     signal      STrigRising         :   std_logic                       := '0';
@@ -57,25 +46,16 @@ architecture Behavioral of SCCBRegisterTable is
     signal      SReadyRising        :   std_logic                       := '0';
 
     signal      SCounter            :   integer range 0 to 58           := 0;
-    signal      SModeCtr            :   integer range 0 to 5            := 0;
 
-    signal      SWriteState         :   std_logic                       := '0';
 	 
-	 signal		 SWaitCtr				:   integer range 0 to 255				:= 0;
-	 
-	 attribute keep  : boolean;
-    attribute keep of SReadData: signal is true;
+    signal      SWaitCtr            :   integer range 0 to 255				:= 0;
 
     
 begin
     STrig           <=  PITrig;
     SDone           <=  PIDone;
     SReady          <=  PIReady;
-    SReadDone       <=  PIReadDone;
-    SReadData       <=  PIReadData;
 
-    POMode          <=  SMode;
-    POReadError     <=  SReadError;
     POCfgFinished   <=  SCfgFinished;
     POStart         <=  SStart;    
     POEnable        <=  SEnable;   
@@ -121,26 +101,16 @@ begin
     end process;
 
     BACKEND :   process(PIClock, PIReset)
-        --variable    SModeCtr    :   integer range 0 to 5    := 0;
     begin
         if PIReset = '0' then
             SCfgFinished    <= '0';
             SStart          <= '0';
-            SMode           <= '0';
-            SModeReg        <= '0';
-            SDonePrev       <= '0';
-            SReadDonePrev   <= '0';
-            SReadError      <= '0';
             SEnable         <= '0';
             SAddress        <= (others => '0');
             SRegister       <= (others => '0');
             SWriteData      <= (others => '0');
-            SWriteState     <= '0';
             SCounter        <= 0;
-            SModeCtr			 <= 0;
         elsif rising_edge(PIClock) then
-			SDonePrev       <=	SDone;
-            SReadDonePrev   <=  SReadDone;
 			if SWaitCtr <= 254 then
 				SWaitCtr <= SWaitCtr + 1;
 			else
@@ -148,7 +118,6 @@ begin
                     SEnable     <=  '1';
                     SStart      <=  '1';
                     SAddress    <=  CDeviceBaseAddress(6 downto 0);
-						  SMode           <= '0';
                     if SCounter <= 56 then
                         SCounter    <= SCounter + 1;
                         case SCounter is
@@ -156,8 +125,7 @@ begin
                                 SRegister   <= x"12";
                                 SWriteData  <= x"80";
                             when 1 =>   
-										  SMode           <= '1';
-										  SAddress	<= CDeviceWriteAddress(6 downto 0);
+                                
                                 SRegister   <= x"12";
                                 SWriteData  <= x"80";
                             when 2 =>   
@@ -331,8 +299,6 @@ begin
                                 SRegister       <= x"FF";
                                 SWriteData      <= x"FF";
                                 SMode       <= '0';
-                                SReadError  <=  '0';
-                                SModeCtr    <=  0;
                                 SStart          <=  '0';
                                 SEnable         <= '0';
                                 SCfgFinished    <= '1';
