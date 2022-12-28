@@ -41,7 +41,6 @@ entity SCCBMaster is
         PIAddress   :   in      std_logic_vector(6 downto 0);   --  SCCB hattina bagli olan slave cihazlarinin ana adreslerini isaret eden giris
         PIRegister  :   in      std_logic_vector(7 downto 0);   --  Slave birimin islem yapilacak register adresini belirten giris
         PIWriteData :   in      std_logic_vector(7 downto 0);   --  Master -> Slave yonunde yazilacak data
-        PIMode      :   in      std_logic;                      --  SCCB mod secenegi girisi
         PIStart     :   in      std_logic;                      --  SCCB master backend calistirma girisi
         PODone      :   out     std_logic;                      --  SCCB arayuzunun yazma islemini bitirdigini belirten cikis
         POReady     :   out     std_logic;                      --  SCCB arayuzunun islem yapmaya hazir oldugunu belirten cikis
@@ -65,7 +64,6 @@ architecture Behavioral of SCCBMaster is
     signal      SStart              :   std_logic                           :=  '0';
     signal      SStartReg           :   std_logic                           :=  '0';
     signal      SStartedWrite       :   std_logic                           :=  '0';  
-    signal      SMode               :   std_logic                           :=  '0';
 
     signal      SEnable             :   std_logic                           :=  '0';
     signal      SAddress            :   std_logic_vector(6 downto 0)        :=  (others => '0');
@@ -112,7 +110,6 @@ begin
     SAddress    <=  PIAddress;  
     SRegister   <=  PIRegister; 
     SWriteData  <=  PIWriteData;
-    SMode       <=  PIMode;
     PODone      <=  SDone;
     POReady     <=  SReady;	
 

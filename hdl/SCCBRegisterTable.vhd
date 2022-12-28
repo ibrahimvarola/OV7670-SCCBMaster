@@ -299,7 +299,6 @@ begin
                             when others =>  
                                 SRegister       <= x"FF";
                                 SWriteData      <= x"FF";
-                                SMode       <= '0';
                                 SStart          <=  '0';
                                 SEnable         <= '0';
                                 SCfgFinished    <= '1';
