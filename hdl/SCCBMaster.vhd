@@ -116,15 +116,10 @@ begin
     PODone      <=  SDone;
     POReady     <=  SReady;	
 
-    POSIOC      <=  SSIOCWrite when (SStateWriteBase = idle or SStateWriteBase = start_condition or SStateWriteBase = stop ) else
-                    SSIOCClock;
-
     PIOSIOD     <=  SSIODWrite when SEnable = '1' else 'Z';
 
-    SSIODRead   <=  PIOSIOD;
-
-    SStartReg   <=  '1' when SStart = '1' else
-                    '0' when (SSIOCClock = '0' and SSIOCClockPrev = '1') or PIReset = '0' else
+    SStartReg   <=  '1' when SStart = '1' and SEnable = '1' else
+                    '0' when (SSIOCClock = '0' and SSIOCClockPrev = '1') or PIReset = '0' or SEnable = '0' else
                     SStartReg;
 
 -------------------------------------------------------------------------------------------------------------------------------
@@ -231,7 +226,7 @@ begin
 --  SIOC Ref   |¯¯¯¯¯¯¯|_______|¯¯¯¯¯¯¯|_______|¯¯¯¯¯¯¯|_______|¯¯¯¯¯¯¯|_______|¯¯¯¯¯¯¯|_______|¯¯¯¯¯¯¯|_______|¯¯¯¯¯¯¯|_______ 
 --                         |               |               |               |               |               |               |
 --                         |               |               |               |               |               |               |
---             |¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_  
+--  SIOD Ref   |¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_|¯|_            
 --
 -------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -253,6 +248,11 @@ begin
             SCounter        <=  7;
         elsif rising_edge(PIClock) then
             case SStateWriteBase is
+-------------------------------------------------------------------------------------------------------------------------------------------
+--  "idle" durumu; SStartReg tetiklendiginde address, register ve data bilgilerini registerlerden toplar ve SIOC referans
+--  saatinin yukselen kenarinda "start_condition" durumuna gecer.
+--  SStartReg'in tetiklenmedigi durumda sistem reset (SIOD = 'Z' - SIOC = '1') durumunda kalir.
+-------------------------------------------------------------------------------------------------------------------------------------------
                 when idle =>
                     if SSIOCClock = '0' and SSIOCClockPrev = '1' then
                         if SStartReg = '1' then
@@ -279,8 +279,12 @@ begin
                         SStartedWrite    <= '0';
                         SStateWriteBase <= start_condition;
                     end if;
+-------------------------------------------------------------------------------------------------------------------------------------------
+--  "start_condition" durumu; 2 SIOC referans clock darbesinden sonra SIOD referansinin yukselen kenari ve SIOC referansinin
+--  lojik-0 oldugu anda cache olarak alinan address verisinin ilk bitini sola 1 kere kaydirarak SIOD hattina yazar ve "send_addr" 
+--  durumuna gecer.
+-------------------------------------------------------------------------------------------------------------------------------------------
                 when start_condition =>
-                        
                     if SSIOCClock = '0' and SSIOCClockPrev = '1' then
                         SBusy <= '1';
                         if SBusy = '1' then
@@ -303,6 +307,10 @@ begin
                     else
                         SStateWriteBase      <= start_condition;
                     end if;
+-------------------------------------------------------------------------------------------------------------------------------------------
+--  "send_addr" durumu; SIOD referansinin yukselen kenari ve SIOC referansinin lojik-0 oldugu anda address verisinin geri kalanini
+--  SIOD hattina yazar. Ardindan "Don't Care" bit durumuna gecer ve gecerken SIOD hattini lojik-0 tutar. 
+-------------------------------------------------------------------------------------------------------------------------------------------                    
                 when send_addr =>
                     if SDataClockRef = '1' and SDataClockRefPrev = '0' and SSIOCClock = '0' then
                         if VCounter <= 5 then
@@ -316,19 +324,24 @@ begin
                             end if;
                         else
                             VCounter    := 0;
-                            SSIODWrite   <= '0'; ----
+                            SSIODWrite   <= '0'; ---->>>> Don't Care Bit!
                             SStateWriteBase      <= addr_dc;
                             SBusy       <= '0';
                         end if;
                     else
                         SStateWriteBase      <= send_addr;
                     end if;
+
                 when addr_dc =>
                     if SDataClockRef = '1' and SDataClockRefPrev = '0' and SSIOCClock = '0' then
                         SAddr   <=  (others => '0');
                     elsif SDataClockRef = '0' and SDataClockRefPrev = '1' and SSIOCClock = '0' then
                         SStateWriteBase      <= send_reg;
                     end if;
+-------------------------------------------------------------------------------------------------------------------------------------------
+--  "send_reg" durumu; SIOD referansinin yukselen kenari ve SIOC referansinin lojik-0 oldugu anda register verisini SIOD hattina yazar.
+--  Ardindan "Don't Care" bit durumuna gecer ve gecerken SIOD hattini lojik-0 tutar. 
+-------------------------------------------------------------------------------------------------------------------------------------------   
                 when send_reg =>
                     if SDataClockRef = '1' and SDataClockRefPrev = '0' and SSIOCClock = '0' then
                         SBusy <= '1';
@@ -345,27 +358,33 @@ begin
                             else
                                 SBusy <= '0';
                                 VCounter    := 0;
-                                SSIODWrite   <= '0'; ----
+                                SSIODWrite   <= '0'; ---->>>> Don't Care Bit!
                                 SStateWriteBase      <= reg_dc;
                             end if;
                         end if;
                     end if;
+-------------------------------------------------------------------------------------------------------------------------------------------
+--  "reg_dc" durumu; "Don't Care" biti yazildiktan sonra diger durumlarda oldugu gibi SIOD ve SIOC referans saat sinyallerine
+--  gore islem yapar. Bu sefer data verisinin ilk bitini sola kaydirarak SIOD hattina yazar ve "send_data" durumuna gecer.
+-------------------------------------------------------------------------------------------------------------------------------------------   
                 when reg_dc =>
                     if SDataClockRef = '1' and SDataClockRefPrev = '0' and SSIOCClock = '0' then
                         SReg   <=  (others => '0');
-                            SStateWriteBase      <= send_data;
-                            if(SData(7) = '1') then
-                                SSIODWrite   <= '1';
-                                SData       <= std_logic_vector(shift_left(unsigned(SData), 1));
-                                SBusy <= '0';
-                            elsif (SData(7) = '0') then
-                                SSIODWrite   <= '0';
-                                SData       <= std_logic_vector(shift_left(unsigned(SData), 1));
-                                SBusy <= '0';
-                            end if;
-                    elsif SDataClockRef = '0' and SDataClockRefPrev = '1' and SSIOCClock = '0' then
-
+                        SStateWriteBase      <= send_data;
+                        if(SData(7) = '1') then
+                            SSIODWrite   <= '1';
+                            SData       <= std_logic_vector(shift_left(unsigned(SData), 1));
+                            SBusy <= '0';
+                        elsif (SData(7) = '0') then
+                            SSIODWrite   <= '0';
+                            SData       <= std_logic_vector(shift_left(unsigned(SData), 1));
+                            SBusy <= '0';
+                        end if;
                     end if;
+-------------------------------------------------------------------------------------------------------------------------------------------
+--  "reg_dc" durumu; gonderilmek istenen verinin ilk biti yazdirildiktan sonra geri kalan bitler sola kaydirilarak SIOD hattina
+--  yazilir. Ardindan "Don't Care" biti yazilir, 1 SIOD ve SIOC referans saati beklenir ve "data_dc" durumuna gecilir. 
+-------------------------------------------------------------------------------------------------------------------------------------------   
                 when send_data =>
                     if SDataClockRef = '1' and SDataClockRefPrev = '0' and SSIOCClock = '0' then
                         if VCounter     <= 6 then
@@ -389,11 +408,18 @@ begin
                             
                         end if;
                     end if;
+------------------------------------------------------------------------------------------
+--  "data_dc" durumu; sadece 1 clock SIOC referans bekleyerek "stop" durumuna gecer.
+------------------------------------------------------------------------------------------
                 when data_dc =>
                     if SSIOCClock = '1' and SSIOCClockPrev = '0' then
                         SData      <= (others => '0');
                         SStateWriteBase <= stop;
                     end if;
+-------------------------------------------------------------------------------------------------------------------------------------------
+--  "stop" durumu; ilk olarak SCCB haberlesmesini sonlandirmak icin ilk olarak SIOC hattini lojik-1 yapar, ardindan 1 SIOC saat
+--  referansi bekledikten sonra SIOD hattini lojik-1 yapar ve "idle" durumuna gecis yapar.
+-------------------------------------------------------------------------------------------------------------------------------------------   
                 when stop =>
                     SSIOCWrite   <= '1';
                     if SSIOCClock = '1' and SSIOCClockPrev = '0' then
