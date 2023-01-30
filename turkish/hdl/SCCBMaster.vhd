@@ -113,6 +113,9 @@ begin
     PODone      <=  SDone;
     POReady     <=  SReady;	
 
+    POSIOC      <=  SSIOCWrite when (SStateWriteBase = idle or SStateWriteBase = start_condition or SStateWriteBase = stop ) else
+                    SSIOCClock;
+    
     PIOSIOD     <=  SSIODWrite when SEnable = '1' else 'Z';
 
     SStartReg   <=  '1' when SStart = '1' and SEnable = '1' else
